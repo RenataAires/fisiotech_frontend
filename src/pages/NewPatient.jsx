@@ -185,12 +185,16 @@ export default function NewPatient() {
   };
 
   const handleSubmit = async () => {
+
+    if (loading) return;
+
     if (!form.lgpd_consent) {
       setError("É necessário aceitar o termo de consentimento");
       return;
     }
     setLoading(true);
     setError("");
+
     try {
       const payload = {
         ...form,
@@ -215,14 +219,16 @@ export default function NewPatient() {
 
         await api.post("/api/sessions/schedule", {
           patient_id: data.patient.id,
-          treatment_plan_id: data.patient.id,
+          treatment_plan_id: data.plan.id,
           session_date: sessionDate,
           session_number: 1,
         });
       }
 
       navigate("/"); // ← navega só no final
+
     } catch (err) {
+      console.error("Erro no cadastro", err);
       setError(err.response?.data?.error || "Erro ao cadastrar paciente");
     } finally {
       setLoading(false);
