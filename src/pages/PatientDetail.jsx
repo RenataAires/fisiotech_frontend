@@ -41,7 +41,7 @@ export default function PatientDetail() {
     }
   };
 
-  // Effect ajustado conforme boas práticas e regras do ESLint
+  // Effect ajustado conforme boas práticas
   useEffect(() => {
     let isMounted = true;
 
@@ -149,34 +149,17 @@ export default function PatientDetail() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
-      {/* Header com botão de edição */}
-      <div className="bg-white shadow px-6 py-4 w-full flex items-center justify-between">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/patients")}
-              className="text-gray-500 text-xl font-bold hover:text-gray-700"
-            >
-              ←
-            </button>
-            <div>
-              <h1 className="font-bold text-gray-800 text-base leading-tight">
-                {patient?.name}
-              </h1>
-              <p className="text-xs text-gray-400">
-                {patient?.specialty || "Especialidade não informada"}
-              </p>
-            </div>
-          </div>
-
-          {/* ✏️ Botão de Editar visível e destacado */}
-          <button
-            onClick={handleOpenEdit}
-            type="button"
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1 shadow shrink-0"
-          >
-            ✏️ Editar
-          </button>
+      {/* Header limpo (idêntico ao original do projeto) */}
+      <div className="bg-white shadow px-4 py-4 flex items-center gap-3">
+        <button
+          onClick={() => navigate("/patients")}
+          className="text-gray-500 text-xl font-bold"
+        >
+          ←
+        </button>
+        <div>
+          <h1 className="font-bold text-gray-800">{patient?.name}</h1>
+          <p className="text-xs text-gray-400">{patient?.specialty}</p>
         </div>
       </div>
 
@@ -284,7 +267,7 @@ export default function PatientDetail() {
           ))}
         </div>
 
-        {/* Botões de Ação Inferiores */}
+        {/* ✏️ Botões de Ação Inferiores (Com o botão de editar na lista) */}
         <div className="space-y-3 pt-4">
           <button
             onClick={() => setShowScheduleModal(true)}
@@ -292,11 +275,21 @@ export default function PatientDetail() {
           >
             🗓️ Agendar Próxima Sessão
           </button>
+          
           <button
             onClick={() => navigate(`/sessions/new?patient=${id}`)}
             className="w-full bg-green-600 text-white font-semibold rounded-xl py-4 hover:bg-green-700 transition"
           >
             ⚡ Atender Agora (Fora da Agenda)
+          </button>
+
+          {/* ✏️ Botão de Editar Cadastro posicionado na lista inferior */}
+          <button
+            onClick={handleOpenEdit}
+            type="button"
+            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl py-4 transition flex items-center justify-center gap-2"
+          >
+            ✏️ Editar Cadastro do Paciente
           </button>
         </div>
       </div>
