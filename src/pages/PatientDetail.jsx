@@ -9,10 +9,25 @@ export default function PatientDetail() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Estados do Modal de Agendamento
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleData, setScheduleData] = useState({ date: "", time: "" });
   const [isScheduling, setIsScheduling] = useState(false);
 
+  // ✏️ Estados para Edição do Paciente
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    birth_date: "",
+    address: "",
+    specialty: "",
+    health_plan: "",
+    diagnosis: "",
+  });
+
+  // Função genérica para recarregar dados após alterações
   const fetchData = async () => {
     try {
       const [patientRes, sessionsRes] = await Promise.all([
@@ -22,23 +37,84 @@ export default function PatientDetail() {
       setPatient(patientRes.data);
       setSessions(sessionsRes.data);
     } catch (err) {
-      console.error("Erro ao carregar dados:", err);
-    } finally {
-      loading && setLoading(false);
+      console.error("Erro ao recarregar dados:", err);
     }
   };
 
+  // Effect ajustado conforme boas práticas e regras do ESLint
   useEffect(() => {
-    fetchData();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      try {
+        const [patientRes, sessionsRes] = await Promise.all([
+          api.get(`/api/patients/${id}`),
+          api.get(`/api/sessions/patient/${id}`),
+        ]);
+        if (isMounted) {
+          setPatient(patientRes.data);
+          setSessions(sessionsRes.data);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados iniciais:", err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
+
+  // ✏️ Preenche o modal de edição com os dados atuais
+  const handleOpenEdit = () => {
+    if (!patient) return;
+    setEditForm({
+      name: patient.name || "",
+      phone: patient.phone || "",
+      birth_date: patient.birth_date ? patient.birth_date.split("T")[0] : "",
+      address: patient.address || "",
+      specialty: patient.specialty || "",
+      health_plan: patient.health_plan || "",
+      diagnosis: patient.diagnosis || "",
+    });
+    setShowEditModal(true);
+  };
+
+  // ✏️ Salva as alterações via PUT
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.name || !editForm.phone) {
+      alert("Nome e Telefone são obrigatórios!");
+      return;
+    }
+    setIsEditing(true);
+    try {
+      await api.put(`/api/patients/${id}`, editForm);
+      alert("Cadastro atualizado com sucesso!");
+      setShowEditModal(false);
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao editar paciente:", err);
+      alert(err.response?.data?.error || "Erro ao atualizar dados.");
+    } finally {
+      setIsEditing(false);
+    }
+  };
 
   const handleCancelSession = async (sessionId) => {
     if (!window.confirm("Deseja realmente cancelar esta sessão?")) return;
     try {
       await api.put(`/api/sessions/${sessionId}/cancel`);
       alert("Sessão cancelada!");
-      fetchData();
+      await fetchData();
     } catch (err) {
+      console.error("Erro ao cancelar sessão:", err);
       alert("Erro ao cancelar.");
     }
   };
@@ -60,8 +136,9 @@ export default function PatientDetail() {
       });
       alert("Sessão agendada!");
       setShowScheduleModal(false);
-      fetchData();
+      await fetchData();
     } catch (err) {
+      console.error("Erro ao agendar sessão:", err);
       alert("Erro ao agendar.");
     } finally {
       setIsScheduling(false);
@@ -72,17 +149,34 @@ export default function PatientDetail() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
-      {/* Header */}
-      <div className="bg-white shadow px-4 py-4 flex items-center gap-3">
-        <button
-          onClick={() => navigate("/patients")}
-          className="text-gray-500 text-xl"
-        >
-          ←
-        </button>
-        <div>
-          <h1 className="font-bold text-gray-800">{patient?.name}</h1>
-          <p className="text-xs text-gray-400">{patient?.specialty}</p>
+      {/* Header com botão de edição */}
+      <div className="bg-white shadow px-6 py-4 w-full flex items-center justify-between">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/patients")}
+              className="text-gray-500 text-xl font-bold hover:text-gray-700"
+            >
+              ←
+            </button>
+            <div>
+              <h1 className="font-bold text-gray-800 text-base leading-tight">
+                {patient?.name}
+              </h1>
+              <p className="text-xs text-gray-400">
+                {patient?.specialty || "Especialidade não informada"}
+              </p>
+            </div>
+          </div>
+
+          {/* ✏️ Botão de Editar visível e destacado */}
+          <button
+            onClick={handleOpenEdit}
+            type="button"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1 shadow shrink-0"
+          >
+            ✏️ Editar
+          </button>
         </div>
       </div>
 
@@ -92,7 +186,7 @@ export default function PatientDetail() {
           <h2 className="font-semibold text-gray-700 flex items-center gap-2">
             💰 Histórico de Atendimentos
           </h2>
-          
+
           {sessions.map((session) => (
             <div
               key={session.id}
@@ -108,8 +202,8 @@ export default function PatientDetail() {
                       session.status?.toLowerCase() === "realizada"
                         ? "bg-blue-50 text-blue-600"
                         : session.status?.toLowerCase() === "cancelada"
-                        ? "bg-red-50 text-red-500 border border-red-100"
-                        : "bg-orange-50 text-orange-600"
+                          ? "bg-red-50 text-red-500 border border-red-100"
+                          : "bg-orange-50 text-orange-600"
                     }`}
                   >
                     {session.status?.toUpperCase()}
@@ -143,7 +237,9 @@ export default function PatientDetail() {
                       </button>
                     </>
                   ) : (
-                    <span className="text-[10px] text-gray-300 italic">Sessão cancelada</span>
+                    <span className="text-[10px] text-gray-300 italic">
+                      Sessão cancelada
+                    </span>
                   )}
                 </div>
               </div>
@@ -171,15 +267,15 @@ export default function PatientDetail() {
                       {session.status?.toLowerCase() === "realizada"
                         ? "⏳ Pendente"
                         : session.status?.toLowerCase() === "cancelada"
-                        ? "🚫 OFF"
-                        : "🗓️ Agendado"}
+                          ? "🚫 OFF"
+                          : "🗓️ Agendado"}
                     </span>
                     <p className="text-[9px] text-gray-400 mt-1">
                       {session.status?.toLowerCase() === "realizada"
                         ? "Lançar valor"
                         : session.status?.toLowerCase() === "cancelada"
-                        ? "Sem cobrança"
-                        : "Aguardando"}
+                          ? "Sem cobrança"
+                          : "Aguardando"}
                     </p>
                   </div>
                 )}
@@ -239,6 +335,130 @@ export default function PatientDetail() {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição do Paciente */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-lg font-bold text-gray-800">
+                ✏️ Editar Cadastro
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Nome completo *
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Telefone *
+                </label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, phone: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Data de Nascimento
+                </label>
+                <input
+                  type="date"
+                  value={editForm.birth_date}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, birth_date: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Endereço
+                </label>
+                <textarea
+                  rows={2}
+                  value={editForm.address}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, address: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Especialidade
+                </label>
+                <input
+                  type="text"
+                  value={editForm.specialty}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, specialty: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Convênio
+                </label>
+                <input
+                  type="text"
+                  value={editForm.health_plan}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, health_plan: e.target.value })
+                  }
+                  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="pt-3 space-y-2">
+                <button
+                  type="submit"
+                  disabled={isEditing}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition disabled:opacity-50"
+                >
+                  {isEditing ? "Salvando..." : "Salvar Alterações"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="w-full text-gray-400 text-xs py-2"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
